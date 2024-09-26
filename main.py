@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from functionsBD import create_new_product, create_new_order, create_new_order_item, get_products, get_orders, get_product_by_id, get_order_by_id, delete_product, update_product_info, update_order_status
+from functions_for_BD import create_new_product, create_new_order,  get_products, get_orders, get_product_by_id, get_order_by_id, delete_product, update_product_info, update_order_status
 from typing import List
 from get_session_maker import get_session_maker
 from pydantic_models import ProductResponse, ProductRequest, OrderResponse, OrderRequest, ProductInOrderRequest, OrderStatusRequest
@@ -9,17 +9,11 @@ app = FastAPI()
 #Создание фабрики сессий
 SessionLocal = get_session_maker()
 
-@app.get("/")
-async def read_root():
-    """
-    Получает список всех продуктов из базы данных.
-    """
-    return {"message" : "Hello!"}
-
 @app.get("/products")
-async def get_products():
+async def send_products():
     """
-    Получает список всех продуктов из базы данных.
+    Запрос для получения списка всех продуктов.
+    Ответ: 200 ОК Список продуктов или сообщение "Нет товаров"
     """
     with SessionLocal() as session:
         products_list = get_products(session) #Получение списка продуктов
@@ -30,22 +24,25 @@ async def get_products():
             return products_list
 
 @app.get("/orders", response_model=List[OrderResponse])
-async def get_orders():
+async def send_orders():
     """
-    Получает список всех заказов из базы данных.
+    Запрос для получения списка всех заказов.
+    Ответ: 200 ОК Список заказов или сообщение "Заказов нет"
     """
     with SessionLocal() as session:
         orders_list = get_orders(session) #Получение списка заказов
 
         if len(orders_list) == 0:
-            return {"message":"Товаров нет"}
+            return {"message":"Заказов нет"}
         else:
             return orders_list
 
 @app.get("/products/{product_id}")
-async def get_product(product_id: int):
+async def send_product(product_id: int):
     """
-    Получает продукта по id.
+    Запрос для получения продукта по ID.
+    ID передается в параметрах пути.
+    Ответ: 200 ОК продукт или сообщение "Продукт не найден"
     """
     with SessionLocal() as session:
         product = get_product_by_id(session, product_id) #Получение продукта 
@@ -56,9 +53,11 @@ async def get_product(product_id: int):
             return product
     
 @app.get("/orders/{order_id}")
-async def get_order(order_id: int):
+async def send_order(order_id: int):
     """
-    Получает заказа по id.
+    Запрос для получения заказа по ID.
+    ID передается в параметрах пути.
+    Ответ: 200 ОК заказ или сообщение "Заказ не найден"
     """
     with SessionLocal() as session:
         order = get_order_by_id(session, order_id) #Получение заказа 
@@ -71,8 +70,9 @@ async def get_order(order_id: int):
 @app.post("/products")
 async def create_product(product: ProductRequest):
     """
-    Создание продукта.
-    Запрос принимает Json данные формата ProductRequest
+    Запрос для получения создания продукта.
+    Информация о продукте передается в параметрах запроса.
+    Ответ: 200 ОК сообщение о создании заказа или об ошибки
     """
     with SessionLocal() as session:
         product_id = create_new_product(session, product.name, product.description, product.price, product.stock_quantity) #Создание заказа
@@ -86,8 +86,10 @@ async def create_product(product: ProductRequest):
 @app.put("/products/{product_id}")
 async def update_product(product: ProductRequest, product_id: int):
     """
-    Полная замена существующего товара.
-    Возвращает статус операции.
+    Запрос для изменения продукта.
+    ID продукта передается в параметрах пути.
+    Информация о продукте передается в параметрах запроса.
+    Ответ: 200 ОК сообщение об успешной замене продукта или не существовании товара
     """
     with SessionLocal() as session:
         result_update = update_product_info(session, product_id, product.name, product.description, product.price, product.stock_quantity) #Изменение каждого параметра товара
@@ -95,11 +97,11 @@ async def update_product(product: ProductRequest, product_id: int):
         return {"massage": result_update}
         
 @app.delete("/products/{product_id}")
-async def delete_prodcut(product_id: int):
+async def delete_product_from_db(product_id: int):
     """
-    Удаление товара по ID
-    Возвращает ошибки 404 в случае ошибки базы данных или не существовании предмета.
-    Возвращает сообщение 
+    Запрос для удаления продукта.
+    ID продукта передается в параметрах пути.
+    Ответ: 200 ОК сообщение об успешном удалении продукта. 404 в случае если нет товара или произошла ошибка.
     """
     with SessionLocal() as session:
         result_delete = delete_product(session, product_id)#Удаление товара
@@ -112,10 +114,12 @@ async def delete_prodcut(product_id: int):
             return {"message": f"Product {product_id} deleted"}
 
 @app.patch("/orders/{order_id}")
-def update_order_status(status: OrderStatusRequest, order_id: int):
+def update_order_status_db(status: OrderStatusRequest, order_id: int):
     """
-    Обновление статуса заказа по ID
-    
+    Запрос для обновления статуса заказа.
+    ID заказа передается в параметрах пути.
+    Новый стату передается в параметрах запроса.
+    Ответ: 200 ОК сообщение об успешной замене статуса, 404 в случае если нет товара или произошла ошибка.
     """
     with SessionLocal() as session:
         result_update_status = update_order_status(session, order_id, status.status)
@@ -126,17 +130,18 @@ def update_order_status(status: OrderStatusRequest, order_id: int):
             raise HTTPException(status_code=404, detail=result_update_status)
         
 @app.post("/orders")
-async def create_product(order: OrderRequest, products: List[ProductInOrderRequest]):
+async def create_order_db(order: OrderRequest, products: List[ProductInOrderRequest]):
     """
-    Создание заказа и товаров в заказе.
-    По умолчанию принимается, что  все товары в заказе ProductInOrderRequest принадлежат создаваемому OrderRequest
-    
+    Запрос для создания заказа.
+    Информация о заказе и продуктах в заказе передаются в параметрах запроса.
+    Ответ: 200 ОК сообщение об успешном создании, 404 в случае если нехватает продуктов или произошла ошибка.
     """
     with SessionLocal() as session:
-        result_created_order = create_new_order(session, order.date, order.status, products) #Добавление заказа. Функция возвращает ID добавленного заказа
+        str_result_created, int_result_created = create_new_order(session, order.date, order.status, products) #Добавление заказа. Функция возвращает ID добавленного заказа
 
-        if result_created_order == -1:
-            raise HTTPException(status_code=404, detail="Error created order")
-        
-        return 
+        if int_result_created == 0:
+            return {"message":f"Succes created order {int_result_created}"}
+        else:
+            raise HTTPException(status_code=404, detail=str_result_created)
+
        

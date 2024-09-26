@@ -1,4 +1,4 @@
-from startBD import Product, Order, OrderItem, OrderStatus
+from start_DB import Product, Order, OrderItem, OrderStatus
 from sqlalchemy import  Integer, String, Float, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic_models import ProductInOrderRequest
 
-def create_new_product(session: Session, name_product: String, description_product: String, price_product: Float, quantity: Integer) -> Integer:
+def create_new_product(session: Session, name_product: String, description_product: String, price_product: Float, quantity: Integer) -> int:
     """
     Создание товара в таблице Product
     
@@ -38,7 +38,7 @@ def create_new_product(session: Session, name_product: String, description_produ
         return -1
 
 
-def checking_quantity(session: Session, products: List[ProductInOrderRequest]) -> Integer:
+def checking_quantity(session: Session, products: List[ProductInOrderRequest]) -> int:
     """
     Проходит по списку товаров в заказе и проверяет их доступность по колличеству
 
@@ -46,30 +46,40 @@ def checking_quantity(session: Session, products: List[ProductInOrderRequest]) -
     :param products: Список товаров в заказе
     :return: Id нехватающего товара или -1
     """
-
     for product in products:
         ex_product = get_product_by_id(session, product.product_id) #Получаем экземпляр товара
-            
-        if ex_product.stock_quantity < product.quantity:#Проверка колличества
-            return product.product_id #Если нехватка товара, вернет его ID
-
+        if ex_product:
+            if ex_product.stock_quantity < product.quantity:#Проверка колличества
+                return product.product_id #Если нехватка товара, вернет его ID
+        else: 
+            return -2
     return -1
     
 
-def create_new_order(session: Session, date_order: DateTime, status: OrderStatus, products: List[ProductInOrderRequest]) -> String:
+def create_new_order(session: Session, date_order: DateTime, status: OrderStatus, products: List[ProductInOrderRequest]) -> tuple[str, int]:
     """
-    Создание заказа в таблице Order
-    
+    Создание нового заказа в таблице Order.
+    1. Проверяется доступность всех товаров.
+    2. Добавляется заказ.
+    3.1 Добавляются все элементы ProductInOrderRequest
+    3.2 Меняется значение количества доступного товара
+
     :param session: Объект сессии SQLAlchemy.
-    :return: Id созданного заказа.
+    :param date_order: Дата заказа
+    :param status: Статус заказа
+    :param products: Список товаров для добавления в заказ
+    :return: ID созданного заказа с сообщением Succes или код ошибки и сообщение об ошибке.
     """
     #Проверка колличетсва товара
     result_checking = checking_quantity(session, products)
     if result_checking != -1:
-        return f"There is not enough product with ID {result_checking}"
+        return f"There is not enough product with ID {result_checking}", result_checking
+    elif result_checking == -2:
+        return f"Uncorrect product id", result_checking
 
     #Добавление заказа и товаров в заказ
     try:
+        #Создание заказа
         new_order = Order(
             created_at=datetime.now(),
             updated_at=datetime.now(),
@@ -77,8 +87,10 @@ def create_new_order(session: Session, date_order: DateTime, status: OrderStatus
             status=status
         )
         session.add(new_order)
+        session.flush()
 
         for product in products:
+            #Создание запаиси в таблицу OrderItem
             new_order_item = OrderItem(
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
@@ -86,51 +98,20 @@ def create_new_order(session: Session, date_order: DateTime, status: OrderStatus
                 product_id= product.product_id,
                 quantity= product.quantity          
             )
-            
-            #Проверка колличества товара
-            ex_product = get_product_by_id(session, product.product_id) #Получаем экземпляр товара
-            if ex_product.stock_quantity < product.quantity:
-                session.rollback()
-                return f"Error: There is not enough product with id {product.product_id}"
             session.add(new_order_item)
+
+            #Изменение количества товара
+            ex_product = get_product_by_id(session, product.product_id) #Получаем экземпляр товара
+            ex_product.stock_quantity -= new_order_item.quantity
             
-        
         session.commit()
-
-        return new_order.id
+        return "Success", 0
     
     except SQLAlchemyError as e:
-        # В случае любой ошибки при работе с базой данных возвращаем текст ошибки
+        # В случае любой ошибки при работе с базой данных возвращает текст ошибки
         session.rollback()
-        return f"Error: {e}"
-
-
-def create_new_order_item(session: Session, order_id_: Integer, product_id_: Integer, quantity_: Integer) -> Integer:
-    """
-    Создание элемента в таблицу OrderItem
+        return f"Error: {e}", -1
     
-    :param session: Объект сессии SQLAlchemy.
-    :return:  id созданного элемента.
-    """
-    try:
-        new_order_item = OrderItem(
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-            order_id=order_id_,    
-            product_id=product_id_,
-            quantity=quantity_          
-        )
-
-        session.add(new_order_item)
-        session.commit() 
-
-        return new_order_item.id
-    
-    except SQLAlchemyError as e:
-        # В случае любой ошибки при работе с базой данных возвращаем -1
-        session.rollback()
-        return -1
-
 
 def get_products(session: Session) -> List[Product]:
     """
@@ -189,7 +170,7 @@ def delete_product(session: Session, id_product: Integer) -> int:
 
     :param session: Объект сессии SQLAlchemy.
     :param id_product: ID продукта, который нужно удалить.
-    :return: True, если продукт успешно удалён; False, если продукт не найден.
+    :return: 1 если продукт удален. 0 если продукт не найден. -1 если произошла ошибка
     """
     product = session.query(Product).filter(Product.id == id_product).first() 
     if product:
@@ -210,7 +191,7 @@ def delete_product(session: Session, id_product: Integer) -> int:
     return 0
 
 
-def update_product_info(session: Session, id_product: Integer, new_name_product: Optional[String] = None, new_description_product: Optional[String] = None, new_price_product: Optional[Float] = None, new_quantity: Optional[Integer] = None) -> String:
+def update_product_info(session: Session, id_product: Integer, new_name_product: Optional[String] = None, new_description_product: Optional[String] = None, new_price_product: Optional[Float] = None, new_quantity: Optional[Integer] = None) -> str:
     """
     Обновляет информацию о продукте по его ID.
     Если передается аргумент, то происходит соответствуещее изменение продукта.
@@ -256,7 +237,7 @@ def update_product_info(session: Session, id_product: Integer, new_name_product:
         return "The product is not missing"
     
 
-def update_order_status(session: Session, id_order: Integer, new_status: OrderStatus) -> String:
+def update_order_status(session: Session, id_order: Integer, new_status: OrderStatus) -> str:
     """
     Обновляет статус заказа по ID.
 
@@ -288,3 +269,32 @@ def update_order_status(session: Session, id_order: Integer, new_status: OrderSt
 
     else:
         return "The product is not missing"
+    
+
+
+
+#def create_new_order_item(session: Session, order_id_: Integer, product_id_: Integer, quantity_: Integer) -> Integer:
+#    """
+ #   Создание элемента в таблицу OrderItem
+  #  
+   # :param session: Объект сессии SQLAlchemy.
+    #:return:  id созданного элемента.
+    #"""
+    #try:
+    #    new_order_item = OrderItem(
+    #        created_at=datetime.now(),
+    #        updated_at=datetime.now(),
+    #        order_id=order_id_,    
+    #        product_id=product_id_,
+    #        quantity=quantity_          
+    #    )
+
+    #    session.add(new_order_item)
+    #    session.commit() 
+#
+   #     return new_order_item.id
+ #   
+  #  except SQLAlchemyError as e:
+   #     # В случае любой ошибки при работе с базой данных возвращаем -1
+    #    session.rollback()
+     #   return -1

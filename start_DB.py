@@ -1,10 +1,9 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Enum
+from sqlalchemy import Integer, String, Float, DateTime, ForeignKey, Enum
 from sqlalchemy.orm import relationship, Mapped, mapped_column, declarative_base
 from sqlalchemy.ext.declarative import declarative_base
 import enum
 from datetime import datetime
 from sqlalchemy import event
-import configparser
 from get_session_maker import get_engine_db
 
 #Создание объекта Engine
