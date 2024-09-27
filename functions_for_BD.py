@@ -32,7 +32,7 @@ def create_new_product(session: Session, name_product: String, description_produ
 
         return new_product.id
     
-    except SQLAlchemyError as e:
+    except Exception as e:
         # В случае любой ошибки при работе с базой данных возвращаем -1
         session.rollback()
         return -1
@@ -56,7 +56,7 @@ def checking_quantity(session: Session, products: List[ProductInOrderRequest]) -
     return -1
     
 
-def create_new_order(session: Session, date_order: DateTime, status: OrderStatus, products: List[ProductInOrderRequest]) -> tuple[str, int]:
+def create_new_order(session: Session, date_order: DateTime, status: OrderStatus, products: List[ProductInOrderRequest]) -> tuple[str, int, Optional[int]]:
     """
     Создание нового заказа в таблице Order.
     1. Проверяется доступность всех товаров.
@@ -73,9 +73,9 @@ def create_new_order(session: Session, date_order: DateTime, status: OrderStatus
     #Проверка колличетсва товара
     result_checking = checking_quantity(session, products)
     if result_checking != -1:
-        return f"There is not enough product with ID {result_checking}", result_checking
+        return f"There is not enough product with ID {result_checking}", result_checking, None
     elif result_checking == -2:
-        return f"Uncorrect product id", result_checking
+        return f"Uncorrect product id", result_checking, None
 
     #Добавление заказа и товаров в заказ
     try:
@@ -105,12 +105,12 @@ def create_new_order(session: Session, date_order: DateTime, status: OrderStatus
             ex_product.stock_quantity -= new_order_item.quantity
             
         session.commit()
-        return "Success", 0
+        return "Success", 0, new_order.id
     
     except SQLAlchemyError as e:
         # В случае любой ошибки при работе с базой данных возвращает текст ошибки
         session.rollback()
-        return f"Error: {e}", -1
+        return f"Error: {e}", -1, None
     
 
 def get_products(session: Session) -> List[Product]:

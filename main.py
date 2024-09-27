@@ -67,34 +67,37 @@ async def send_order(order_id: int):
         else: 
             return order
     
-@app.post("/products")
+@app.post("/products", response_model=ProductResponse)
 async def create_product(product: ProductRequest):
     """
     Запрос для получения создания продукта.
     Информация о продукте передается в параметрах запроса.
-    Ответ: 200 ОК сообщение о создании заказа или об ошибки
+    Ответ: 200 ОК информацию о товаре или ошибку
     """
     with SessionLocal() as session:
         product_id = create_new_product(session, product.name, product.description, product.price, product.stock_quantity) #Создание заказа
 
         if product_id > -1:
-            return {"message" : f"Created {product_id} product"}
+            return get_product_by_id(session, product_id)
         else:
-            return {"massege" : "Database error"}
+            raise HTTPException(status_code=504, detail="Ошибка базы данных")
 
 
-@app.put("/products/{product_id}")
+@app.put("/products/{product_id}", response_model=ProductResponse)
 async def update_product(product: ProductRequest, product_id: int):
     """
     Запрос для изменения продукта.
     ID продукта передается в параметрах пути.
     Информация о продукте передается в параметрах запроса.
-    Ответ: 200 ОК сообщение об успешной замене продукта или не существовании товара
+    Ответ: 200 ОК информацию о товаре или ошибку
     """
     with SessionLocal() as session:
         result_update = update_product_info(session, product_id, product.name, product.description, product.price, product.stock_quantity) #Изменение каждого параметра товара
 
-        return {"massage": result_update}
+        if result_update == "Success":
+            return get_product_by_id(session, product_id)
+        else:
+            raise HTTPException(status_code=404, detail=result_update)
         
 @app.delete("/products/{product_id}")
 async def delete_product_from_db(product_id: int):
@@ -109,39 +112,38 @@ async def delete_product_from_db(product_id: int):
         if result_delete == 0:
             raise HTTPException(status_code=404, detail="Item not found")
         elif result_delete == -1:
-            raise HTTPException(status_code=404, detail="Database Error")
+            raise HTTPException(status_code=504, detail="Database Error")
         else:
             return {"message": f"Product {product_id} deleted"}
 
-@app.patch("/orders/{order_id}")
+@app.patch("/orders/{order_id}", response_model=OrderResponse)
 def update_order_status_db(status: OrderStatusRequest, order_id: int):
     """
     Запрос для обновления статуса заказа.
     ID заказа передается в параметрах пути.
     Новый стату передается в параметрах запроса.
-    Ответ: 200 ОК сообщение об успешной замене статуса, 404 в случае если нет товара или произошла ошибка.
+    Ответ: 200 ОК информация о заказе, 404 в случае если нет товара или произошла ошибка.
     """
     with SessionLocal() as session:
         result_update_status = update_order_status(session, order_id, status.status)
 
         if  result_update_status == "Success":
-            return {"message": "Order updated success"}
+            return get_order_by_id(session, order_id)
         else:
             raise HTTPException(status_code=404, detail=result_update_status)
         
-@app.post("/orders")
+@app.post("/orders", response_model=OrderResponse)
 async def create_order_db(order: OrderRequest, products: List[ProductInOrderRequest]):
     """
     Запрос для создания заказа.
     Информация о заказе и продуктах в заказе передаются в параметрах запроса.
-    Ответ: 200 ОК сообщение об успешном создании, 404 в случае если нехватает продуктов или произошла ошибка.
+    Ответ: 200 ОК информацию о заказе, 404 в случае если нехватает продуктов или произошла ошибка.
     """
     with SessionLocal() as session:
-        str_result_created, int_result_created = create_new_order(session, order.date, order.status, products) #Добавление заказа. Функция возвращает ID добавленного заказа
+        str_result_created, int_result_created, id_order = create_new_order(session, order.date, order.status, products) #Добавление заказа. Функция возвращает ID добавленного заказа
 
         if int_result_created == 0:
-            return {"message":f"Succes created order {int_result_created}"}
+            return get_order_by_id(session, id_order)
         else:
             raise HTTPException(status_code=404, detail=str_result_created)
 
-       
