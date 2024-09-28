@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from start_DB import OrderStatus
+from app.models import OrderStatus
 
 #Создание Pydantic моделей для валидации данных при работе запросов
 class ProductResponse(BaseModel):

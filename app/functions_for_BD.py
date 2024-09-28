@@ -1,10 +1,10 @@
-from start_DB import Product, Order, OrderItem, OrderStatus
+from app.models import Product, Order, OrderItem, OrderStatus
 from sqlalchemy import  Integer, String, Float, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Optional
-from pydantic_models import ProductInOrderRequest
+from app.schemas import ProductInOrderRequest
 
 def create_new_product(session: Session, name_product: String, description_product: String, price_product: Float, quantity: Integer) -> int:
     """

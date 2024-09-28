@@ -4,10 +4,6 @@ from sqlalchemy.ext.declarative import declarative_base
 import enum
 from datetime import datetime
 from sqlalchemy import event
-from get_session_maker import get_engine_db
-
-#Создание объекта Engine
-engine = get_engine_db()
 
 # Создаём базовый класс для описания моделей
 Base = declarative_base()
@@ -71,6 +67,3 @@ class OrderItem(BaseModel):
 def update_timestamp_before_update(mapper, connection, target):
     # Автоматически обновляем поле updated_at на текущее время
     target.updated_at = datetime.now()
-
-# Создание всех таблиц и обработчиков
-Base.metadata.create_all(bind=engine)

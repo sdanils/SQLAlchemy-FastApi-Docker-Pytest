@@ -1,8 +1,17 @@
 from fastapi import FastAPI, HTTPException
-from functions_for_BD import create_new_product, create_new_order,  get_products, get_orders, get_product_by_id, get_order_by_id, delete_product, update_product_info, update_order_status
+from app.functions_for_BD import create_new_product, create_new_order,  get_products, get_orders, get_product_by_id, get_order_by_id, delete_product, update_product_info, update_order_status
 from typing import List
-from get_session_maker import get_session_maker
-from pydantic_models import ProductResponse, ProductRequest, OrderResponse, OrderRequest, ProductInOrderRequest, OrderStatusRequest
+from app.get_session_maker import get_session_maker
+from app.schemas import ProductResponse, ProductRequest, OrderResponse, OrderRequest, ProductInOrderRequest, OrderStatusRequest
+from app import models
+from app.get_session_maker import get_engine_db
+import uvicorn
+
+#Запуск БД
+#Создание объекта Engine
+engine = get_engine_db()
+# Создание всех таблиц и обработчиков
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -23,7 +32,7 @@ async def send_products():
         else:
             return products_list
 
-@app.get("/orders", response_model=List[OrderResponse])
+@app.get("/orders")
 async def send_orders():
     """
     Запрос для получения списка всех заказов.
@@ -146,4 +155,3 @@ async def create_order_db(order: OrderRequest, products: List[ProductInOrderRequ
             return get_order_by_id(session, id_order)
         else:
             raise HTTPException(status_code=404, detail=str_result_created)
-
