@@ -190,6 +190,25 @@ def delete_product(session: Session, id_product: Integer) -> int:
             return -1
     return 0
 
+def delete_order(session: Session, id_order: Integer) -> int:
+    """
+    Удаляет заказ из таблицы заказов. Используется только в контексте тестов и после удаления товаров и зависимых обьектов.
+
+    :param session: Объект сессии SQLAlchemy.
+    :param id_order: ID заказа, который нужно удалить.
+    :return: 1 если продукт удален. 0 если продукт не найден. -1 если произошла ошибка
+    """
+    order = session.query(Order).filter(Order.id == id_order).first() 
+    if order:
+        try:
+            session.delete(order)
+            session.commit()
+            return 1
+        except SQLAlchemyError as e:
+            session.rollback()
+            return -1
+    return 0
+
 
 def update_product_info(session: Session, id_product: Integer, new_name_product: Optional[String] = None, new_description_product: Optional[String] = None, new_price_product: Optional[Float] = None, new_quantity: Optional[Integer] = None) -> str:
     """
