@@ -2,11 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 from app.get_session_maker import get_session_maker
 from app.main import app
-from app.start_DB import OrderStatus
+from app.models import OrderStatus
 from app.functions_for_BD import create_new_product, delete_product, get_product_by_id, delete_order
 from app.get_session_maker import get_session_maker
 from datetime import datetime
 
+#Тесты не работают с текущеми параметрами приложения, так как приложение настроено для работы в Docker контейнерах.
+#Для запуска тестов нейбходимо изменить DATABASE_URL в get_session_maker()
 SessionLocal = get_session_maker()
 
 @pytest.fixture
